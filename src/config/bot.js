@@ -1,5 +1,32 @@
 import { logger } from '../utils/logger.js';
 
+// =============================================================================
+// HELPERS (env parsing + time constants)
+// =============================================================================
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+const SNOWFLAKE_REGEX = /^\d{17,20}$/;
+
+/** Reads a comma-separated env var into a clean array of strings. */
+const envList = (name) =>
+  (process.env[name] ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+/** Reads a boolean env var ("true", "1", "yes", "on" are truthy). */
+const envBool = (name, defaultValue = false) => {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return defaultValue;
+  return ["true", "1", "yes", "on"].includes(raw.trim().toLowerCase());
+};
+
+/** Reads an optional ID env var, returning null when unset/empty. */
+const envId = (name) => process.env[name]?.trim() || null;
+
 export const botConfig = {
   // =========================
   // BOT PRESENCE (what users see under the bot name)
@@ -10,8 +37,8 @@ export const botConfig = {
   // - "dnd"       = red do-not-disturb
   // - "invisible" = appears offline
   presence: {
-    // Current online state shown on Discord.
-    status: "online",
+    // Current online state shown on Discord (override with BOT_STATUS env var).
+    status: process.env.BOT_STATUS || "online",
 
     // Activity lines shown under the bot name.
     // `type` number mapping from Discord:
@@ -24,8 +51,8 @@ export const botConfig = {
     activities: [
       {
         name: "Custom Status", // required by Discord API, not shown in the client
-        state: "COMMAND BOT",     // this is what people actually see
-        type: 4,               // Custom
+        state: process.env.BOT_STATUS_TEXT || "COMMAND BOT", // this is what people actually see
+        type: 4, // Custom
       },
     ],
   },
@@ -36,7 +63,7 @@ export const botConfig = {
   commands: {
     // Bot owner user IDs (comma-separated in OWNER_IDS env var).
     // Owners can access owner/admin-level bot commands.
-    owners: process.env.OWNER_IDS?.split(",").map((id) => id.trim()).filter(Boolean) || [],
+    owners: envList("OWNER_IDS"),
 
     // Default wait time between command uses (in seconds).
     defaultCooldown: 3,
@@ -48,7 +75,7 @@ export const botConfig = {
     testGuildId: process.env.TEST_GUILD_ID,
 
     // When true (or MAINTENANCE_MODE=true), only bot owners can run commands.
-    maintenanceMode: process.env.MAINTENANCE_MODE === "true",
+    maintenanceMode: envBool("MAINTENANCE_MODE"),
 
     // Command prefix for text-based commands (e.g., "!" for "!ping").
     // Supports both slash commands and prefix commands.
@@ -82,8 +109,8 @@ export const botConfig = {
     // Auto-delete approved applications after this many days.
     deleteApprovedAfter: 30,
 
-    // Role IDs allowed to manage applications.
-    managerRoles: [], // Will be populated from environment or database
+    // Role IDs allowed to manage applications (APPLICATION_MANAGER_ROLES env, comma-separated).
+    managerRoles: envList("APPLICATION_MANAGER_ROLES"),
   },
 
   // =========================
@@ -126,17 +153,16 @@ export const botConfig = {
         closed: "#ED4245",
         pending: "#99AAB5",
       },
-      economy: "#F1C40F",
       birthday: "#E91E63",
       moderation: "#9B59B6",
 
       // Ticket priority color mapping.
       priority: {
         none: "#95A5A6",
-        low: "#3498db",
-        medium: "#2ecc71",
-        high: "#f1c40f",
-        urgent: "#e74c3c",
+        low: "#3498DB",
+        medium: "#2ECC71",
+        high: "#F1C40F",
+        urgent: "#E74C3C",
       },
     },
     footer: {
@@ -156,131 +182,54 @@ export const botConfig = {
   },
 
   // =========================
-  // ECONOMY SETTINGS
-  // =========================
-  economy: {
-    currency: {
-      // Currency display name.
-      name: "coins",
-      // Plural display name.
-      namePlural: "coins",
-      // Currency symbol shown in balances.
-      symbol: "$",
-    },
-
-    // Starting balance for new users.
-    startingBalance: 0,
-
-    // Maximum bank amount before upgrades (if upgrades are used).
-    baseBankCapacity: 100000,
-
-    // Daily reward amount.
-    dailyAmount: 100,
-
-    // Work command random payout range.
-    workMin: 10,
-    workMax: 100,
-
-    // Beg command random payout range.
-    begMin: 5,
-    begMax: 50,
-
-    // Command cooldowns (milliseconds).
-    cooldowns: {
-      daily: 24 * 60 * 60 * 1000,
-      work: 60 * 60 * 1000,
-      crime: 2 * 60 * 60 * 1000,
-      rob: 4 * 60 * 60 * 1000,
-    },
-
-    // Chance to succeed when robbing (0.4 = 40%).
-    robSuccessRate: 0.4,
-
-    // Jail time after failed rob (milliseconds).
-    // 3600000 = 1 hour.
-    robFailJailTime: 3600000,
-  },
-
-  // =========================
-  // SHOP SETTINGS
-  // =========================
-  // Add shop defaults here when needed.
-  shop: {
-
-  },
-
-  // =========================
   // TICKET SYSTEM
   // =========================
   tickets: {
     // Category ID where new tickets are created (null = no forced category).
-    defaultCategory: null,
+    defaultCategory: envId("TICKET_CATEGORY_ID"),
 
-    // Role IDs allowed to manage/support tickets.
-    supportRoles: [],
+    // Role IDs allowed to manage/support tickets (TICKET_SUPPORT_ROLES env, comma-separated).
+    supportRoles: envList("TICKET_SUPPORT_ROLES"),
 
     // Priority options users/staff can assign.
     priorities: {
-      none: {
-        emoji: "⚪",
-        color: "#95A5A6",
-        label: "None",
-      },
-      low: {
-        emoji: "🟢",
-        color: "#2ECC71",
-        label: "Low",
-      },
-      medium: {
-        emoji: "🟡",
-        color: "#F1C40F",
-        label: "Medium",
-      },
-      high: {
-        emoji: "🔴",
-        color: "#E74C3C",
-        label: "High",
-      },
-      urgent: {
-        emoji: "🚨",
-        color: "#E91E63",
-        label: "Urgent",
-      },
+      none: { emoji: "⚪", color: "#95A5A6", label: "None" },
+      low: { emoji: "🟢", color: "#2ECC71", label: "Low" },
+      medium: { emoji: "🟡", color: "#F1C40F", label: "Medium" },
+      high: { emoji: "🔴", color: "#E74C3C", label: "High" },
+      urgent: { emoji: "🚨", color: "#E91E63", label: "Urgent" },
     },
 
-    // Default priority for new tickets.
+    // Default priority for new tickets (must be a key of `priorities`).
     defaultPriority: "none",
 
     // Category ID where closed tickets are archived.
-    archiveCategory: null,
+    archiveCategory: envId("TICKET_ARCHIVE_CATEGORY_ID"),
 
     // Channel ID where ticket logs are sent.
-    logChannel: null,
+    logChannel: envId("TICKET_LOG_CHANNEL_ID"),
   },
 
   // =========================
   // GIVEAWAY SETTINGS
   // =========================
   giveaways: {
-    // Default giveaway duration in milliseconds.
-    // 86400000 = 24 hours.
-    defaultDuration: 86400000,
+    // Default giveaway duration in milliseconds (24 hours).
+    defaultDuration: DAY,
 
     // Allowed winner count range.
     minimumWinners: 1,
     maximumWinners: 10,
 
     // Allowed giveaway duration range in milliseconds.
-    // 300000 = 5 minutes.
-    minimumDuration: 300000,
-    // 2592000000 = 30 days.
-    maximumDuration: 2592000000,
+    minimumDuration: 5 * MINUTE,
+    maximumDuration: 30 * DAY,
 
-    // Role IDs allowed to host giveaways.
-    allowedRoles: [],
+    // Role IDs allowed to host giveaways (GIVEAWAY_ALLOWED_ROLES env).
+    allowedRoles: envList("GIVEAWAY_ALLOWED_ROLES"),
 
-    // Role IDs that bypass giveaway restrictions.
-    bypassRoles: [],
+    // Role IDs that bypass giveaway restrictions (GIVEAWAY_BYPASS_ROLES env).
+    bypassRoles: envList("GIVEAWAY_BYPASS_ROLES"),
   },
 
   // =========================
@@ -288,13 +237,13 @@ export const botConfig = {
   // =========================
   birthday: {
     // Role ID given to users on their birthday.
-    defaultRole: null,
+    defaultRole: envId("BIRTHDAY_ROLE_ID"),
 
     // Channel ID where birthday announcements are posted.
-    announcementChannel: null,
+    announcementChannel: envId("BIRTHDAY_CHANNEL_ID"),
 
-    // Timezone used to calculate birthday dates.
-    timezone: "UTC",
+    // Timezone used to calculate birthday dates (IANA name, e.g. "Europe/Amsterdam").
+    timezone: process.env.BIRTHDAY_TIMEZONE || "UTC",
   },
 
   // =========================
@@ -323,7 +272,6 @@ export const botConfig = {
       serverSizeThreshold: 1000,
 
       // Allowed safety limits for account-age requirements.
-      // 1 = minimum day, 365 = maximum days.
       minAccountAge: 1,
       maxAccountAge: 365,
 
@@ -334,27 +282,24 @@ export const botConfig = {
       criteria: {
         account_age: "Account must be older than specified days",
         server_size: "All users if server has less than 1000 members",
-        none: "All users immediately"
-      }
+        none: "All users immediately",
+      },
     },
 
     // Minimum time between verification attempts (milliseconds).
-    // 5000 = 5 seconds.
-    verificationCooldown: 5000,
+    verificationCooldown: 5 * SECOND,
 
     // Maximum failed attempts allowed inside the time window below.
     maxVerificationAttempts: 3,
 
     // Time window for counting attempts (milliseconds).
-    // 60000 = 1 minute.
-    attemptWindow: 60000,
+    attemptWindow: MINUTE,
 
     // In-memory safety limits (helps avoid unbounded memory growth).
     maxCooldownEntries: 10000,
     maxAttemptEntries: 10000,
     // Cleanup frequency for cooldown/attempt maps (milliseconds).
-    // 300000 = 5 minutes.
-    cooldownCleanupInterval: 300000,
+    cooldownCleanupInterval: 5 * MINUTE,
     // Maximum metadata payload size for audit entries (bytes).
     maxAuditMetadataBytes: 4096,
     // Maximum number of audit entries kept in memory.
@@ -378,9 +323,9 @@ export const botConfig = {
     defaultGoodbyeMessage:
       "{user} has left the server. We now have {memberCount} members.",
     // Channel ID for welcome messages.
-    defaultWelcomeChannel: null,
+    defaultWelcomeChannel: envId("WELCOME_CHANNEL_ID"),
     // Channel ID for goodbye messages.
-    defaultGoodbyeChannel: null,
+    defaultGoodbyeChannel: envId("GOODBYE_CHANNEL_ID"),
   },
 
   // =========================
@@ -398,6 +343,8 @@ export const botConfig = {
     },
     permissions: {
       // Default denied permissions for the counter channel.
+      // NOTE: discord.js v14 uses PascalCase flag names ("ViewChannel"); these
+      // legacy names are kept for compatibility with existing counter code.
       deny: ["VIEW_CHANNEL"],
       // Default allowed permissions for the counter channel.
       allow: ["VIEW_CHANNEL", "CONNECT", "SPEAK"],
@@ -410,22 +357,23 @@ export const botConfig = {
     },
     types: {
       // Built-in counter types and how each count is calculated.
+      // Note: bots/humans rely on the member cache; fetch members first for exact numbers.
       members: {
         name: "👥 Members",
         description: "Total members in the server",
-        getCount: (guild) => guild.memberCount.toString(),
+        getCount: (guild) => String(guild.memberCount),
       },
       bots: {
         name: "🤖 Bots",
         description: "Total bot accounts in the server",
         getCount: (guild) =>
-          guild.members.cache.filter((m) => m.user.bot).size.toString(),
+          String(guild.members.cache.filter((m) => m.user.bot).size),
       },
       members_only: {
         name: "👤 Humans",
         description: "Total human members (non-bots)",
         getCount: (guild) =>
-          guild.members.cache.filter((m) => !m.user.bot).size.toString(),
+          String(guild.members.cache.filter((m) => !m.user.bot).size),
       },
     },
   },
@@ -449,7 +397,7 @@ export const botConfig = {
   // Set any feature to `false` to disable it globally.
   features: {
     // Core systems.
-    economy: true,
+    economy: false, // economy removed; keeps any leftover economy commands disabled
     leveling: true,
     moderation: true,
     logging: true,
@@ -477,19 +425,30 @@ export const botConfig = {
   },
 };
 
-export function validateConfig(config) {
+// =============================================================================
+// VALIDATION
+// =============================================================================
+const VALID_STATUSES = ["online", "idle", "dnd", "invisible"];
+
+/**
+ * Validates environment variables and config sanity.
+ * Returns an array of human-readable error strings (empty = valid).
+ */
+export function validateConfig(config = botConfig) {
   const errors = [];
 
-  if (process.env.NODE_ENV !== 'production') {
-    logger.debug('Environment variables check:');
-    logger.debug('DISCORD_TOKEN exists:', !!process.env.DISCORD_TOKEN);
-    logger.debug('TOKEN exists:', !!process.env.TOKEN);
-    logger.debug('CLIENT_ID exists:', !!process.env.CLIENT_ID);
-    logger.debug('GUILD_ID exists:', !!process.env.GUILD_ID);
-    logger.debug('POSTGRES_HOST exists:', !!process.env.POSTGRES_HOST);
-    logger.debug('NODE_ENV:', process.env.NODE_ENV);
+  // --- Debug output (booleans only, never secret values) ---
+  if (process.env.NODE_ENV !== "production") {
+    logger.debug("Environment variables check:");
+    logger.debug("DISCORD_TOKEN exists:", !!process.env.DISCORD_TOKEN);
+    logger.debug("TOKEN exists:", !!process.env.TOKEN);
+    logger.debug("CLIENT_ID exists:", !!process.env.CLIENT_ID);
+    logger.debug("GUILD_ID exists:", !!process.env.GUILD_ID);
+    logger.debug("POSTGRES_HOST exists:", !!process.env.POSTGRES_HOST);
+    logger.debug("NODE_ENV:", process.env.NODE_ENV);
   }
 
+  // --- Required environment ---
   if (!process.env.DISCORD_TOKEN && !process.env.TOKEN) {
     errors.push("Bot token is required (DISCORD_TOKEN or TOKEN environment variable)");
   }
@@ -498,7 +457,7 @@ export function validateConfig(config) {
     errors.push("Client ID is required (CLIENT_ID environment variable)");
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === "production") {
     // A full connection URL (DATABASE_URL / POSTGRES_URL) satisfies all Postgres
     // requirements, matching how src/config/database/postgres.js resolves the pool config.
     const hasConnectionUrl = Boolean(process.env.POSTGRES_URL || process.env.DATABASE_URL);
@@ -516,6 +475,42 @@ export function validateConfig(config) {
     }
   }
 
+  // --- Config sanity checks ---
+  if (!VALID_STATUSES.includes(config.presence?.status)) {
+    errors.push(`presence.status must be one of: ${VALID_STATUSES.join(", ")}`);
+  }
+
+  if (!config.commands?.prefix || /\s/.test(config.commands.prefix)) {
+    errors.push("commands.prefix must be a non-empty string without whitespace");
+  }
+
+  const invalidOwners = (config.commands?.owners ?? []).filter((id) => !SNOWFLAKE_REGEX.test(id));
+  if (invalidOwners.length > 0) {
+    errors.push(`OWNER_IDS contains invalid Discord IDs: ${invalidOwners.join(", ")}`);
+  }
+
+  const gw = config.giveaways ?? {};
+  if (gw.minimumWinners > gw.maximumWinners) {
+    errors.push("giveaways.minimumWinners must be <= giveaways.maximumWinners");
+  }
+  if (gw.minimumDuration > gw.maximumDuration) {
+    errors.push("giveaways.minimumDuration must be <= giveaways.maximumDuration");
+  }
+  if (gw.defaultDuration < gw.minimumDuration || gw.defaultDuration > gw.maximumDuration) {
+    errors.push("giveaways.defaultDuration must be within the min/max duration range");
+  }
+
+  if (!config.tickets?.priorities?.[config.tickets?.defaultPriority]) {
+    errors.push("tickets.defaultPriority must match a key in tickets.priorities");
+  }
+
+  const timezone = config.birthday?.timezone;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+  } catch {
+    errors.push(`birthday.timezone "${timezone}" is not a valid IANA timezone`);
+  }
+
   return errors;
 }
 
@@ -529,6 +524,9 @@ if (configErrors.length > 0) {
 
 export const BotConfig = botConfig;
 
+// =============================================================================
+// COMMAND CATEGORY -> FEATURE TOGGLE MAP
+// =============================================================================
 const COMMAND_CATEGORY_FEATURE_MAP = {
   birthday: "birthday",
   community: "community",
@@ -554,6 +552,9 @@ function normalizeCategoryKey(category) {
   return String(category || "").trim().toLowerCase().replace(/\s+/g, "_");
 }
 
+// =============================================================================
+// PUBLIC HELPERS
+// =============================================================================
 export function getCommandPrefix() {
   return botConfig.commands?.prefix ?? "!";
 }
@@ -565,10 +566,7 @@ export function getBotOwners() {
 }
 
 export function isBotOwner(userId) {
-  if (!userId) {
-    return false;
-  }
-
+  if (!userId) return false;
   return getBotOwners().includes(String(userId));
 }
 
@@ -576,76 +574,85 @@ export function isMaintenanceMode() {
   return botConfig.commands?.maintenanceMode === true;
 }
 
+/**
+ * Returns a configured message with {placeholders} filled in.
+ * Unknown placeholders are left untouched; unknown keys return the key itself.
+ */
 export function getBotMessage(key, replacements = {}) {
-  let message = botConfig.messages?.[key] || key;
+  const template = botConfig.messages?.[key] ?? key;
 
-  for (const [placeholder, value] of Object.entries(replacements)) {
-    message = message.replace(new RegExp(`\\{${placeholder}\\}`, "g"), String(value));
-  }
-
-  return message;
+  return template.replace(/\{(\w+)\}/g, (match, name) =>
+    Object.prototype.hasOwnProperty.call(replacements, name)
+      ? String(replacements[name])
+      : match,
+  );
 }
 
 export function isFeatureEnabled(featureKey) {
-  if (!featureKey) {
-    return true;
-  }
-
+  if (!featureKey) return true;
   return botConfig.features?.[featureKey] !== false;
 }
 
 export function isCommandCategoryEnabled(category) {
   const normalized = normalizeCategoryKey(category);
 
-  if (!normalized || normalized === "core") {
-    return true;
-  }
+  if (!normalized || normalized === "core") return true;
 
   const featureKey = COMMAND_CATEGORY_FEATURE_MAP[normalized];
-  if (!featureKey) {
-    return true;
-  }
+  if (!featureKey) return true;
 
   return isFeatureEnabled(featureKey);
 }
 
+/** Converts "#RRGGBB" (or a 0xRRGGBB number) to an integer color, or null if invalid. */
+function toColorInt(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)) {
+    return parseInt(value.slice(1), 16);
+  }
+  return null;
+}
+
+/**
+ * Resolves a color to a Discord-ready integer.
+ * Accepts a number, a "#RRGGBB" hex string, or a dot path into embeds.colors
+ * (e.g. "success", "ticket.open"). Falls back to `fallback` if it can't resolve.
+ */
+export function getColor(path, fallback = "#99AAB5") {
+  const direct = toColorInt(path);
+  if (direct !== null) return direct;
+
+  const resolved = String(path ?? "")
+    .split(".")
+    .reduce((obj, key) => (obj && typeof obj === "object" ? obj[key] : undefined), botConfig.embeds.colors);
+
+  return toColorInt(resolved) ?? toColorInt(fallback) ?? 0x99aab5;
+}
+
 export function getApplicationStatusColor(status) {
-  const colors = botConfig.applications?.statusColors || {};
-  const hex = colors[status];
-  return hex ? getColor(hex) : getColor(status === "approved" ? "success" : status === "denied" ? "error" : "warning");
+  const hex = botConfig.applications?.statusColors?.[status];
+  if (hex) return getColor(hex);
+
+  return getColor(status === "approved" ? "success" : status === "denied" ? "error" : "warning");
 }
 
 export function getDefaultApplicationQuestions() {
-  return (botConfig.applications?.defaultQuestions || []).map((entry) =>
-    typeof entry === "string" ? entry : entry.question,
-  ).filter(Boolean);
+  return (botConfig.applications?.defaultQuestions || [])
+    .map((entry) => (typeof entry === "string" ? entry : entry.question))
+    .filter(Boolean);
 }
 
-export function getColor(path, fallback = "#99AAB5") {
-  
-  if (typeof path === "number") return path;
-  if (typeof path === "string" && path.startsWith("#")) {
-    
-    return parseInt(path.replace("#", ""), 16);
-  }
-  const result = path
-    .split(".")
-    .reduce(
-      (obj, key) => (obj && obj[key] !== undefined ? obj[key] : fallback),
-      botConfig.embeds.colors,
-    );
-  
-  if (typeof result === "string" && result.startsWith("#")) {
-    return parseInt(result.replace("#", ""), 16);
-  }
-  return result;
+/** Recursively collects every hex color in the palette. */
+function collectColors(node) {
+  if (typeof node === "string") return [node];
+  if (node && typeof node === "object") return Object.values(node).flatMap(collectColors);
+  return [];
 }
 
+/** Returns a random palette color as a Discord-ready integer. */
 export function getRandomColor() {
-  const colors = Object.values(botConfig.embeds.colors).flatMap((color) =>
-    typeof color === "string" ? color : Object.values(color),
-  );
-  return colors[Math.floor(Math.random() * colors.length)];
+  const colors = collectColors(botConfig.embeds.colors);
+  return getColor(colors[Math.floor(Math.random() * colors.length)]);
 }
 
 export default botConfig;
