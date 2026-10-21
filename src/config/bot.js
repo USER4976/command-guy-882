@@ -51,8 +51,8 @@ export const botConfig = {
     activities: [
       {
         name: "Custom Status", // required by Discord API, not shown in the client
-        state: process.env.BOT_STATUS_TEXT || "COMMAND BOT", // this is what people actually see
-        type: 4, // Custom
+        state: process.env.BOT_STATUS_TEXT || "HOW TO DO COMMANDS", // this is what people actually see
+        type: 2, // Custom
       },
     ],
   },
