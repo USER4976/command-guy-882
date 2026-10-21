@@ -52,7 +52,7 @@ export const botConfig = {
       {
         name: "Custom Status", // required by Discord API, not shown in the client
         state: process.env.BOT_STATUS_TEXT || "HOW TO DO COMMANDS", // this is what people actually see
-        type: 2, // Custom
+        type: 4, // Custom (must stay 4 for the text to show on its own)
       },
     ],
   },
