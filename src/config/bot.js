@@ -25,7 +25,7 @@ export const botConfig = {
       {
         name: "PEOPLE TYPE COMMAND", // required by Discord API, not shown in the client
         state: "PEOPLE TYPE COMMANDS",     // this is what people actually see
-        type: 3,               // Custom
+        type: 4,               // Custom
       },
     ],
   },
