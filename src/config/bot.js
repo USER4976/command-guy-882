@@ -23,9 +23,9 @@ export const botConfig = {
     // 5 = Competing
     activities: [
       {
-        name: "PEOPLE TYPE COMMAND", // required by Discord API, not shown in the client
+        name: "STATUS", // required by Discord API, not shown in the client
         state: "PEOPLE TYPE COMMANDS",     // this is what people actually see
-        type: 4,               // Custom
+        type: 3,               // Custom
       },
     ],
   },
